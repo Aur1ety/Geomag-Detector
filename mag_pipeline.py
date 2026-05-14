@@ -92,7 +92,7 @@ def parse_mag_nc(filepath: Path) -> pd.DataFrame:
 def load_mag_directory(directory: str) -> pd.DataFrame:
     """
     Load and concatenate all MAG L2 NetCDF files found recursively
-    in a directory. Automatically skips L1 files.
+    in a directory. Automatically skips L1 files and corrupt files.
 
     Parameters
     ----------
@@ -103,23 +103,37 @@ def load_mag_directory(directory: str) -> pd.DataFrame:
     Concatenated DataFrame sorted by time, duplicates removed
     """
     all_files = sorted(Path(directory).rglob("*.nc"))
-    l2_files  = [f for f in all_files if f.name.startswith("L2_") and "(" not in f.name]
-    skipped   = len(all_files) - len(l2_files)
+    l2_files  = [
+        f for f in all_files
+        if f.name.startswith("L2_") and "(" not in f.name
+    ]
+    skipped = len(all_files) - len(l2_files)
 
     if skipped:
-        logger.warning("Skipped %d non-L2 files", skipped)
+        logger.warning("Skipped %d non-L2 or duplicate files", skipped)
     if not l2_files:
         raise FileNotFoundError(
             f"No L2 MAG .nc files found in: {directory}"
         )
 
-    frames = [parse_mag_nc(f) for f in l2_files]
+    frames = []
+    for f in l2_files:
+        try:
+            frames.append(parse_mag_nc(f))
+        except Exception as e:
+            logger.warning("Skipping corrupt file %s: %s", f.name, e)
+
+    if not frames:
+        raise RuntimeError(
+            "All files failed to parse -- check your data"
+        )
+
     df = pd.concat(frames).sort_index()
     df = df[~df.index.duplicated(keep="first")]
 
     logger.info(
         "MAG loaded: %d rows from %d files | %s to %s",
-        len(df), len(l2_files),
+        len(df), len(frames),
         df.index.min().date(), df.index.max().date()
     )
     return df
