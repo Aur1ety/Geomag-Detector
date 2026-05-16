@@ -1,0 +1,17 @@
+﻿# Data files -- keep on Kaggle, not GitHub
+Data/
+*.nc
+*.cdf
+*.zip
+*.sh
+
+# Model checkpoints
+*.pth
+*.pkl
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Notebooks
+*.ipynb
